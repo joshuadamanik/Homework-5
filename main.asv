@@ -1,0 +1,140 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% HOMEWORK #4
+% Joshua Julian Damanik (20194701)
+% AE551 - Introduction to Optimal Control
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+clear, clc, close all;
+addpath('lib');
+
+X0 = [1000, 0]';
+N = 10;
+
+
+eps = 10;
+k = 15;
+
+%a_list      = [   1,   10,  0.1,    0,     0,    0];
+%c_list      = [   1,    1,    1,    1, 0.005, 0.01];
+marker_list = {'o-', '+-', '^-', 'v-',  'x-', '.-'};
+legends = {};
+
+plot_data = zeros(N+1,3,1);
+
+rho = 10;
+delta_rho = 10;
+
+iter = 0;
+
+
+X = ones(3*N,1);
+X(1:N) = X0(1);
+X(N+1:2*N) = X0(2);
+
+[A, B, R] = cost_function_param(N, X0);
+c = @(X) (A*X-B);
+lambda = ones(length(B),1);
+
+for j = 1:5
+    iter = iter + 1;
+    
+    
+    La = @(X, lambda) (X'*R*X + lambda'*(A*X-B)+rho.*((A*X-B))'*(A*X-B));
+
+    last_X_star = X;
+    
+    for ii = 1:10000
+        %X = zeros(3*N,1);
+        fprintf('j=%d,ii=%d\n',j,ii);
+        
+%         f = @(X) La(X,lambda);
+%         X_star = minimize(X, eps, k, f);
+%         g = @(L) La(X_star,L);
+%         L_star = minimize(lambda, 2*rho, k, g);
+        
+%         g = @(L) La(X_star, L);
+%         L_star = minimize(lambda, 2*rho, k, g);
+%         quasi = quasi_newton_class(length(X));
+%         for n = 1:1000
+%             p = quasi.bgfs(X, eps, f);
+%             [Xa, Xb] = unimodal_interval(X, eps, p, f);
+%             X_star = fibonacci_search(Xa, Xb, k, f);
+% 
+%             err = norm(X_star - X);
+%             X = X_star;
+%             if (err < eps * 0.01)
+%                 break;
+%             end
+%         end
+%         X_star = -(2*R+2*rho*(A'*A)) \ (lambda'*A-2*(B'*A))';
+%         X = X_star;
+%         last_lambda = lambda;
+        L_star = lambda + 2*rho*c(X_star);
+        err = norm(L_star - lambda);
+        if (err < 2*rho*0.01)
+            break;
+        end
+        X = X_star;
+        lambda = L_star;
+    end
+    
+    %U_anal = -R\S'*X0;
+    %Erms = norm(U_anal-U_star)/norm(U_anal)*100;
+    %fprintf('%.4f\t%.4f\t%.8f\n', norm(U_star), norm(U_anal), Erms);
+    
+    plot_data(1,1,j) = X0(1);
+    plot_data(1,2,j) = X0(2);
+    plot_data(2:N+1,1,j) = X_star(1:N);
+    plot_data(2:N+1,2,j) = X_star(N+1:2*N);
+    
+    plot_data(:,3,j) = [X_star(2*N+1:3*N); 0];
+    
+    legends = [legends, {sprintf('rho=%d', rho)}];
+    
+    if (A*X-B)'*(A*X-B) <= 0.01
+        break;
+    end
+    
+    rho = rho*delta_rho;
+    
+end
+
+title = {'Vertical Position', 'Vertical Speed', 'Vertical Input'};
+ylabels = {'Y (m)', 'Vy (m/s)', 'U (m/s2)'};
+legend_position = {'NorthEast', 'SouthEast', 'SouthEast'};
+for i = 1:3
+    figure('Name', title{i}), hold on;
+    set(gcf, 'Position', [100*i, 100*i, 1000, 400]);
+    for j = 1:iter
+        figure(i),plot(5000 / N * (0:N), plot_data(:,i,j), marker_list{mod(j-1,length(marker_list))+1});
+    end
+    grid on;
+    xlabel('x (m)');
+    ylabel(ylabels{i});
+    legend(legends, 'Location', 'Best');
+end
+
+%% Functions
+
+function [J, Y, Vy] = cost_function(U)
+
+N = size(U,1);
+dt = 20 / N;
+
+a = 1;
+c = 1;
+
+Y = zeros(N, 1);
+Vy = zeros(N,1);
+
+Y(1) = 1000;
+Vy(1) = 0;
+
+for i = 2:(N+1)
+    Vy(i) = Vy(i-1) + U(i-1)*dt;
+    Y(i) = Y(i-1) + Vy(i-1)*dt;
+end
+
+J = c./2.*Y(N+1).^2 + 1./2.*sum(a.*(Y(2:N+1).^2) + U(1:N).^2);
+end
+
